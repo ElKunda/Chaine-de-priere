@@ -71,7 +71,7 @@
     let rhemas = {};
     let isDarkMode = localStorage.getItem('chain_theme') === 'dark';
 
-    // --- GÉNÉRATION FICHIER ICS (CALENDRIER) ---
+    // --- GÉNÉRATION D'AGENDA ET ALARMES (iOs & Android) ---
     function formatICSDate(date) {
       return date.toISOString().replace(/-|:|\.\d+/g, '');
     }
@@ -120,13 +120,24 @@
 
       icsContent.push('END:VCALENDAR');
 
-      const blob = new Blob([icsContent.join('\r\n')], { type: 'text/calendar;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = window.URL.createObjectURL(blob);
-      link.setAttribute('download', `Chaine_de_Priere_${targetUser}.ics`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const calendarData = icsContent.join('\r\n');
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+      if (isIOS) {
+        // Ouverture directe de l'application Calendrier sur iOS
+        window.location.href = 'data:text/calendar;charset=utf8,' + encodeURIComponent(calendarData);
+      } else {
+        // Téléchargement / ouverture directe sur Android
+        const blob = new Blob([calendarData], { type: 'text/calendar;charset=utf-8' });
+        const fileURL = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = fileURL;
+        a.target = '_blank';
+        a.setAttribute('download', `Chaine_de_Priere_${targetUser}.ics`);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     }
 
     // --- CHARGEMENT DES RHÉMAS DEPUIS SUPABASE ---
@@ -338,11 +349,11 @@
         `).join('');
 
         main.innerHTML = `
-          <!-- BANNIÈRE D'EXPORTATION CALENDRIER -->
+          <!-- BANNIÈRE SYNCHRONISATION AGENDA -->
           <div class="bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div>
-              <h3 class="font-bold text-indigo-900 dark:text-indigo-200 text-sm">📲 Ne ratez pas votre session !</h3>
-              <p class="text-xs text-indigo-700 dark:text-indigo-300">Ajoutez tous vos créneaux à l'agenda de votre téléphone avec alarme automatique (15 min & 5 min avant).</p>
+              <h3 class="font-bold text-indigo-900 dark:text-indigo-200 text-sm">📲 Synchroniser avec l'agenda</h3>
+              <p class="text-xs text-indigo-700 dark:text-indigo-300">Ajoutez automatiquement vos tours de prière avec alarmes (15 min & 5 min avant) dans l'application Calendrier de votre téléphone.</p>
             </div>
             <button onclick="exportToCalendar()" class="w-full sm:w-auto text-xs bg-indigo-600 text-white font-bold px-4 py-2.5 rounded-xl hover:bg-indigo-700 transition whitespace-nowrap shadow-sm">
               📅 Synchroniser mes alarmes
