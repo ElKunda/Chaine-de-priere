@@ -71,6 +71,64 @@
     let rhemas = {};
     let isDarkMode = localStorage.getItem('chain_theme') === 'dark';
 
+    // --- GÉNÉRATION FICHIER ICS (CALENDRIER) ---
+    function formatICSDate(date) {
+      return date.toISOString().replace(/-|:|\.\d+/g, '');
+    }
+
+    function exportToCalendar(userName) {
+      const targetUser = userName || currentUser;
+      if (!targetUser) return;
+
+      const now = new Date();
+      const allSlots = getAllSlots(now);
+      const userSlots = allSlots.filter(s => s.assignedUser === targetUser);
+
+      let icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Chaine de Priere 24/7//FR',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH'
+      ];
+
+      userSlots.forEach((slot) => {
+        const startStr = formatICSDate(slot.startTime);
+        const endStr = formatICSDate(slot.endTime);
+
+        icsContent.push(
+          'BEGIN:VEVENT',
+          `UID:slot-${slot.slotId}@chainedepriere.com`,
+          `DTSTAMP:${formatICSDate(new Date())}`,
+          `DTSTART:${startStr}`,
+          `DTEND:${endStr}`,
+          `SUMMARY:🙏 Tour de Prière 24/7 - ${slot.assignedUser}`,
+          `DESCRIPTION:C'est votre créneau de prière de 3h ! Connectez-vous à la chaîne de prière.`,
+          'BEGIN:VALARM',
+          'TRIGGER:-PT15M',
+          'ACTION:DISPLAY',
+          'DESCRIPTION:Rappel 15 min avant votre créneau de prière',
+          'END:VALARM',
+          'BEGIN:VALARM',
+          'TRIGGER:-PT5M',
+          'ACTION:DISPLAY',
+          'DESCRIPTION:Rappel 5 min avant votre créneau de prière',
+          'END:VALARM',
+          'END:VEVENT'
+        );
+      });
+
+      icsContent.push('END:VCALENDAR');
+
+      const blob = new Blob([icsContent.join('\r\n')], { type: 'text/calendar;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.setAttribute('download', `Chaine_de_Priere_${targetUser}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
     // --- CHARGEMENT DES RHÉMAS DEPUIS SUPABASE ---
     async function fetchRhemas() {
       const { data, error } = await supabaseClient.from('rhemas').select('*');
@@ -280,6 +338,17 @@
         `).join('');
 
         main.innerHTML = `
+          <!-- BANNIÈRE D'EXPORTATION CALENDRIER -->
+          <div class="bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-indigo-900 dark:text-indigo-200 text-sm">📲 Ne ratez aucun réveil !</h3>
+              <p class="text-xs text-indigo-700 dark:text-indigo-300">Ajoutez tous vos créneaux à l'agenda de votre téléphone avec alarme automatique (15 min & 5 min avant).</p>
+            </div>
+            <button onclick="exportToCalendar()" class="w-full sm:w-auto text-xs bg-indigo-600 text-white font-bold px-4 py-2.5 rounded-xl hover:bg-indigo-700 transition whitespace-nowrap shadow-sm">
+              📅 Synchroniser mes alarmes
+            </button>
+          </div>
+
           ${activeHTML}
           <section>
             <h3 class="font-bold text-lg mb-3 text-slate-800 dark:text-slate-100">Prochains Relais</h3>
@@ -301,8 +370,13 @@
         `).join('');
 
         main.innerHTML = `
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Planning de ${selectedUserView}</h2>
+            <button onclick="exportToCalendar('${selectedUserView}')" class="text-xs bg-indigo-600 text-white font-bold px-3 py-2 rounded-xl hover:bg-indigo-700">
+              📅 Exporter l'agenda de ${selectedUserView}
+            </button>
+          </div>
           <section>
-            <h2 class="text-2xl font-bold mb-4 text-slate-800 dark:text-slate-100">Planning de ${selectedUserView}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">${slotsHTML}</div>
           </section>
         `;
